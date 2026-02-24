@@ -30,7 +30,13 @@ const Ventas = () => {
   };
 
   const actualizarCantidad = (productoId: number, cantidad: number) => {
-    setDetalles((prev) => prev.map((d) => (d.producto_id === productoId ? { ...d, cantidad: Math.max(1, cantidad) } : d)));
+    setDetalles((prev) =>
+      prev.map((d) => (d.producto_id === productoId ? { ...d, cantidad: Number.isNaN(cantidad) ? d.cantidad : cantidad } : d))
+    );
+  };
+
+  const normalizarCantidad = (productoId: number) => {
+    setDetalles((prev) => prev.map((d) => (d.producto_id === productoId ? { ...d, cantidad: Math.max(1, d.cantidad) } : d)));
   };
 
   const eliminarDetalle = (productoId: number) => {
@@ -47,6 +53,12 @@ const Ventas = () => {
   const registrarVenta = async () => {
     if (!clienteId || detalles.length === 0) {
       alert("Cliente y productos requeridos");
+      return;
+    }
+
+    const hasInvalidCantidad = detalles.some((d) => d.cantidad < 1 || Number.isNaN(d.cantidad));
+    if (hasInvalidCantidad) {
+      alert("Todas las cantidades deben ser mayores o iguales a 1");
       return;
     }
 
@@ -132,7 +144,9 @@ const Ventas = () => {
                       min={1}
                       max={producto.stock}
                       value={d.cantidad}
+                      onFocus={(e) => e.target.select()}
                       onChange={(e) => actualizarCantidad(d.producto_id, Number(e.target.value))}
+                      onBlur={() => normalizarCantidad(d.producto_id)}
                     />
                     <button className="btn btn-danger" onClick={() => eliminarDetalle(d.producto_id)}>Quitar</button>
                   </div>

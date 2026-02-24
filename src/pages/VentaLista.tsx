@@ -6,6 +6,12 @@ import { actualizarVenta, getVentas } from "../service/ventaService";
 import type { Cliente } from "../types/cliente";
 import type { MetodoPago, VentaResponse, VentaUpdate } from "../types/venta";
 
+const METODOS_VALIDOS: MetodoPago[] = ["Yape", "Deposito", "Debiendo"];
+
+const toMetodoPago = (metodo: string): MetodoPago => {
+  return METODOS_VALIDOS.includes(metodo as MetodoPago) ? (metodo as MetodoPago) : "Debiendo";
+};
+
 const VentasLista = () => {
   const { hasRole } = useAuth();
   const canConfirm = hasRole("admin", "vendedor");
@@ -18,12 +24,19 @@ const VentasLista = () => {
   const [fechaInicio, setFechaInicio] = useState("");
   const [fechaFin, setFechaFin] = useState("");
   const [expandedVentas, setExpandedVentas] = useState<Record<number, boolean>>({});
+  const [metodoSeleccionado, setMetodoSeleccionado] = useState<Record<number, MetodoPago>>({});
 
   useEffect(() => {
     const fetchData = async () => {
       const [ventasData, clientesData] = await Promise.all([getVentas(), getClientes()]);
       setVentas(ventasData);
       setClientes(clientesData.filter((c) => c.activo));
+
+      const metodosIniciales: Record<number, MetodoPago> = {};
+      for (const venta of ventasData) {
+        metodosIniciales[venta.id] = toMetodoPago(venta.metodo_pago);
+      }
+      setMetodoSeleccionado(metodosIniciales);
     };
 
     fetchData();
@@ -45,7 +58,8 @@ const VentasLista = () => {
     [ventas, filtroCliente, filtroMetodo, filtroConfirmado, fechaInicio, fechaFin]
   );
 
-  const confirmarPago = async (ventaId: number, metodoPago: MetodoPago) => {
+  const confirmarPago = async (ventaId: number) => {
+    const metodoPago = metodoSeleccionado[ventaId] ?? "Debiendo";
     const payload: VentaUpdate = {
       metodo_pago: metodoPago,
       fecha_pago: new Date().toISOString(),
@@ -67,7 +81,7 @@ const VentasLista = () => {
   };
 
   const cambiarMetodoTemporal = (ventaId: number, metodo: MetodoPago) => {
-    setVentas((prev) => prev.map((v) => (v.id === ventaId ? { ...v, metodo_pago: metodo } : v)));
+    setMetodoSeleccionado((prev) => ({ ...prev, [ventaId]: metodo }));
   };
 
   const toggleDetalle = (ventaId: number) => {
@@ -157,13 +171,13 @@ const VentasLista = () => {
                   <select
                     className="select"
                     style={{ maxWidth: 180 }}
-                    value={v.metodo_pago as MetodoPago}
+                    value={metodoSeleccionado[v.id] ?? toMetodoPago(v.metodo_pago)}
                     onChange={(e) => cambiarMetodoTemporal(v.id, e.target.value as MetodoPago)}
                   >
                     <option value="Yape">Yape</option>
                     <option value="Deposito">Deposito</option>
                   </select>
-                  <button className="btn btn-primary" onClick={() => confirmarPago(v.id, v.metodo_pago as MetodoPago)}>
+                  <button className="btn btn-primary" onClick={() => confirmarPago(v.id)}>
                     Confirmar pago
                   </button>
                 </div>
@@ -177,4 +191,3 @@ const VentasLista = () => {
 };
 
 export default VentasLista;
-
