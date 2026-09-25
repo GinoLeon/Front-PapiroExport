@@ -11,6 +11,7 @@ import Productos from "./pages/Productos";
 import Unauthorized from "./pages/Unauthorized";
 import VentaLista from "./pages/VentaLista";
 import Ventas from "./pages/Ventas";
+import DigitalizarComprobante from "./pages/DigitalizarComprobante";
 
 const AppShell = () => {
   const { user, logout } = useAuth();
@@ -30,6 +31,7 @@ const AppShell = () => {
         <ul className="nav-list">
           <li><NavLink to="/dashboard" className="nav-link">Dashboard</NavLink></li>
           <li><NavLink to="/ventas" className="nav-link">Ventas</NavLink></li>
+          {!isAdmin && <li><NavLink to="/digitalizar-comprobante" className="nav-link">Digitalizar comprobante</NavLink></li>}
           <li><NavLink to="/venta-lista" className="nav-link">Listado de ventas</NavLink></li>
           <li><NavLink to="/produccion" className="nav-link">Produccion</NavLink></li>
           <li><NavLink to="/clientes" className="nav-link">Clientes</NavLink></li>
@@ -46,6 +48,7 @@ const AppShell = () => {
         <Routes>
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/ventas" element={<Ventas />} />
+          <Route path="/digitalizar-comprobante" element={isAdmin ? <Unauthorized /> : <DigitalizarComprobante />} />
           <Route path="/venta-lista" element={<VentaLista />} />
           <Route path="/produccion" element={<ProduccionPage />} />
           <Route path="/clientes" element={<Clientes />} />

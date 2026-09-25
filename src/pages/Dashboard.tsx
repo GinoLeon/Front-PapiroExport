@@ -1,6 +1,9 @@
 import { useMemo, useState } from "react";
 
+import Predicciones from "../components/Predicciones";
+import { estadisticasComprobantes } from "../service/comprobanteService";
 import { getVentas } from "../service/ventaService";
+import type { EstadisticasComprobantes } from "../types/comprobante";
 import type { VentaResponse } from "../types/venta";
 import { useEffect } from "react";
 
@@ -14,6 +17,7 @@ type Bucket = {
 };
 
 const currency = new Intl.NumberFormat("es-PE", { style: "currency", currency: "PEN" });
+const percent = new Intl.NumberFormat("es-PE", { style: "percent", maximumFractionDigits: 1 });
 
 const startOfMonth = (d: Date) => new Date(d.getFullYear(), d.getMonth(), 1);
 const endOfMonth = (d: Date) => new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59, 999);
@@ -25,6 +29,7 @@ const Dashboard = () => {
   const [year, setYear] = useState<number>(new Date().getFullYear());
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
+  const [digitalizacion, setDigitalizacion] = useState<EstadisticasComprobantes | null>(null);
 
   useEffect(() => {
     const load = async () => {
@@ -37,6 +42,7 @@ const Dashboard = () => {
     };
 
     load();
+    estadisticasComprobantes().then(setDigitalizacion).catch(() => setDigitalizacion(null));
   }, []);
 
   const years = useMemo(() => {
@@ -179,7 +185,7 @@ const Dashboard = () => {
       <div className="panel" style={{ marginBottom: "1rem" }}>
         <div className="filter-row">
           <select className="select" value={mode} onChange={(e) => setMode(e.target.value as FilterMode)}>
-            <option value="year">Por a�o</option>
+            <option value="year">Por año</option>
             <option value="last6">Ultimos 6 meses</option>
             <option value="last3">Ultimos 3 meses</option>
             <option value="custom">Rango personalizado</option>
@@ -221,6 +227,36 @@ const Dashboard = () => {
         </article>
       </div>
 
+      {digitalizacion && (
+        <>
+          <h3 style={{ margin: "0 0 0.5rem" }}>Digitalización de comprobantes</h3>
+          <div className="dashboard-grid" style={{ marginBottom: "1rem" }}>
+            <article className="panel metric-card">
+              <p className="row-subtitle">Digitalizados automáticamente</p>
+              <p className="price">{digitalizacion.automaticos}</p>
+            </article>
+            <article className="panel metric-card">
+              <p className="row-subtitle">Con intervención manual</p>
+              <p className="price">{digitalizacion.manuales}</p>
+              {digitalizacion.pendientes > 0 && <p className="muted">{digitalizacion.pendientes} pendientes de revisión</p>}
+            </article>
+            <article className="panel metric-card">
+              <p className="row-subtitle">Tasa de automatización</p>
+              <p className="price">
+                {digitalizacion.automaticos + digitalizacion.manuales > 0
+                  ? percent.format(digitalizacion.automaticos / (digitalizacion.automaticos + digitalizacion.manuales))
+                  : "—"}
+              </p>
+            </article>
+            <article className="panel metric-card">
+              <p className="row-subtitle">Cobertura empírica (objetivo {percent.format(digitalizacion.cobertura_objetivo)})</p>
+              <p className="price">{digitalizacion.cobertura_empirica != null ? percent.format(digitalizacion.cobertura_empirica) : "—"}</p>
+              <p className="muted">{digitalizacion.fallas_cobertura} fallas en {digitalizacion.campos_revisados} campos revisados</p>
+            </article>
+          </div>
+        </>
+      )}
+
       <div className="panel chart-wrap">
         <div className="page-header" style={{ marginBottom: "0.5rem" }}>
           <div>
@@ -251,6 +287,9 @@ const Dashboard = () => {
           </>
         )}
       </div>
+
+      <h3 style={{ margin: "1.5rem 0 0.5rem" }}>Predicciones</h3>
+      <Predicciones />
     </section>
   );
 };

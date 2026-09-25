@@ -2,7 +2,6 @@ export interface Cliente {
   id: number;
   nombre: string;
   ruc: string;
-  dni?: string;
   telefono?: string;
   email?: string;
   activo: boolean;
@@ -16,7 +15,6 @@ export interface ClienteCreate {
 export interface ClienteUpdate {
   nombre?: string;
   ruc?: string;
-  dni?: string;
   telefono?: string;
   email?: string;
   activo?: boolean;

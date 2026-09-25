@@ -11,7 +11,6 @@ const Clientes = () => {
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [nombre, setNombre] = useState("");
   const [ruc, setRuc] = useState("");
-  const [dni, setDni] = useState("");
   const [telefono, setTelefono] = useState("");
   const [email, setEmail] = useState("");
   const [clienteEditando, setClienteEditando] = useState<Cliente | null>(null);
@@ -29,7 +28,6 @@ const Clientes = () => {
     setClienteEditando(null);
     setNombre("");
     setRuc("");
-    setDni("");
     setTelefono("");
     setEmail("");
   };
@@ -38,7 +36,7 @@ const Clientes = () => {
     if (!nombre || !ruc) return;
 
     if (clienteEditando) {
-      await actualizarCliente(clienteEditando.id, { nombre, ruc, dni, telefono, email });
+      await actualizarCliente(clienteEditando.id, { nombre, ruc, telefono, email });
     } else {
       await crearCliente({ nombre, ruc });
     }
@@ -51,7 +49,6 @@ const Clientes = () => {
     setClienteEditando(cliente);
     setNombre(cliente.nombre);
     setRuc(cliente.ruc);
-    setDni(cliente.dni ?? "");
     setTelefono(cliente.telefono ?? "");
     setEmail(cliente.email ?? "");
   };
@@ -85,11 +82,6 @@ const Clientes = () => {
           {clienteEditando && (
             <>
               <div>
-                <label className="muted">DNI (opcional)</label>
-                <input className="input" placeholder="DNI (8 digitos)" value={dni} onChange={(e) => setDni(e.target.value)} maxLength={8} />
-              </div>
-
-              <div>
                 <label className="muted">Telefono (opcional)</label>
                 <input className="input" placeholder="Telefono" value={telefono} onChange={(e) => setTelefono(e.target.value)} />
               </div>
@@ -115,7 +107,7 @@ const Clientes = () => {
           <article className="row-card" key={cliente.id}>
             <div>
               <p className="row-title">{cliente.nombre}</p>
-              <p className="row-subtitle">RUC: {cliente.ruc} | DNI: {cliente.dni || "-"} | Tel: {cliente.telefono || "-"} | Email: {cliente.email || "-"}</p>
+              <p className="row-subtitle">RUC: {cliente.ruc} | Tel: {cliente.telefono || "-"} | Email: {cliente.email || "-"}</p>
             </div>
             <div className="btn-group">
               <button className="btn btn-secondary" onClick={() => editarCliente(cliente)}>Editar</button>
