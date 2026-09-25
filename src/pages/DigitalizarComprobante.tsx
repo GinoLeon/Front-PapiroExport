@@ -11,6 +11,7 @@ const SECCIONES: { titulo: string; campos: { key: CampoComprobante; label: strin
   {
     titulo: "Factura",
     campos: [
+      { key: "serie", label: "Serie y número" },
       { key: "fecha_emision", label: "Fecha de emisión" },
       { key: "subtotal", label: "Valor venta (sin IGV)" },
       { key: "igv", label: "IGV" },
@@ -333,6 +334,9 @@ export default function DigitalizarComprobante() {
           </div>
 
           <div className="btn-group" style={{ flexWrap: "wrap", marginBottom: "0.75rem" }}>
+            {resultado.validaciones.duplicado_de_venta && (
+              <span className="badge badge-warn">Ya registrada en la venta #{resultado.validaciones.duplicado_de_venta}</span>
+            )}
             <span className={`badge ${resultado.validaciones.emisor_es_la_empresa !== false ? "badge-ok" : "badge-warn"}`}>Emisor = empresa</span>
             <span className={`badge ${resultado.validaciones.subtotal_mas_igv_igual_total ? "badge-ok" : "badge-warn"}`}>Valor venta + IGV = Total</span>
             <span className={`badge ${resultado.validaciones.items_suma_coincide ? "badge-ok" : "badge-warn"}`}>Ítems = valor venta</span>

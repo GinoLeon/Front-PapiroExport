@@ -1,4 +1,4 @@
-export type CampoComprobante = "ruc" | "razon_social" | "ruc_cliente" | "cliente" | "fecha_emision" | "subtotal" | "igv" | "total";
+export type CampoComprobante = "serie" | "ruc" | "razon_social" | "ruc_cliente" | "cliente" | "fecha_emision" | "subtotal" | "igv" | "total";
 
 export type CampoOCR = {
   valor: string | null;
@@ -52,6 +52,7 @@ export type Comprobante = {
   validaciones: {
     subtotal_mas_igv_igual_total?: boolean;
     emisor_es_la_empresa?: boolean;
+    duplicado_de_venta?: number | null;
     items_suma_coincide?: boolean;
     items_suma?: string;
     sunat?: ValidacionSunat;
