@@ -169,7 +169,7 @@ function TablaItems({ items, subtotal, editable, catalogo, onGuardar }: TablaIte
                       onChange={(e) => editar(n, e.target.value === NUEVO ? { crear_producto: true, producto_id: null } : { crear_producto: false, producto_id: e.target.value ? Number(e.target.value) : null })}>
                       <option value="">— Elegir producto —</option>
                       {original && original.conjunto.length > 0 && (
-                        <optgroup label="Coincidencias sugeridas">
+                        <optgroup label="Lista blanca: más probables">
                           {original.conjunto.map((c) => <option key={c.id} value={c.id}>{c.nombre} ({Math.round(c.similitud * 100)}%)</option>)}
                         </optgroup>
                       )}
@@ -182,7 +182,7 @@ function TablaItems({ items, subtotal, editable, catalogo, onGuardar }: TablaIte
                     <span>{original?.nombre ?? f.descripcion}</span>
                   )}
                   {!editable ? null : seguro ? <span className="badge badge-ok" style={{ marginLeft: 6 }}>Seguro</span>
-                    : !resuelto && <span className="badge badge-warn" style={{ marginLeft: 6 }}>{original?.conjunto.length ? "Elige" : "Sin coincidencia"}</span>}
+                    : !resuelto && <span className="badge badge-warn" style={{ marginLeft: 6 }}>{original?.conjunto.length ? "Elige" : "Fuera de la lista"}</span>}
                 </td>
                 {editable && <td><button className="btn btn-secondary" onClick={() => { setFilas((x) => x.filter((_, i) => i !== n)); setCambios(true); }}>Quitar</button></td>}
               </tr>
