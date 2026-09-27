@@ -18,7 +18,8 @@ export type PrediccionProductos = {
   advertencia?: string;
   mes_objetivo?: string;
   evaluacion?: EvaluacionPrediccion;
-  items: { producto_id: number; nombre: string; cantidad_esperada: number; unidades_ultimos_12_meses: number; meses_con_venta_12: number }[];
+  nivel?: "producto" | "tamano";
+  items: { nombre: string; cantidad_esperada: number; unidades_ultimos_12_meses: number; meses_con_venta_12: number }[];
 };
 
 export type PrediccionClientes = {
