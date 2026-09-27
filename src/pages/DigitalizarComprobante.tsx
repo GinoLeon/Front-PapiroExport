@@ -28,6 +28,8 @@ const soles = new Intl.NumberFormat("es-PE", { style: "currency", currency: "PEN
 const mensajeError = (err: unknown, porDefecto: string) =>
   (axios.isAxiosError(err) && typeof err.response?.data?.detail === "string" && err.response.data.detail) || porDefecto;
 
+const porcentaje = (p?: number) => (p === undefined ? "" : ` · ${Math.round(p * 100)}%`);
+
 const esSingleton = (campo: CampoOCR) => campo.conjunto.length === 1 && !!campo.valor;
 
 type FilaCampoProps = {
@@ -67,7 +69,7 @@ function FilaCampo({ label, campo, editable, confirmado, onConfirmar, onResolver
           </p>
         </div>
         <span className={`badge ${verde ? "badge-ok" : "badge-warn"}`}>
-          {campo.confianza === "confirmada" ? "Confirmado" : verde ? "Alta confianza" : "Requiere revisión"}
+          {campo.confianza === "confirmada" ? "Confirmado" : verde ? `Alta confianza${porcentaje(campo.probabilidades?.[0])}` : "Requiere revisión"}
         </span>
       </div>
 
@@ -80,8 +82,8 @@ function FilaCampo({ label, campo, editable, confirmado, onConfirmar, onResolver
 
       {editable && !verde && campo.conjunto.length > 1 && !manual && (
         <div className="btn-group" style={{ marginTop: "0.5rem", flexWrap: "wrap" }}>
-          {campo.conjunto.map((v) => (
-            <button key={v} className="btn btn-secondary" disabled={guardando} onClick={() => resolver(v, false)}>{v}</button>
+          {campo.conjunto.map((v, i) => (
+            <button key={v} className="btn btn-secondary" disabled={guardando} onClick={() => resolver(v, false)}>{v}{porcentaje(campo.probabilidades?.[i])}</button>
           ))}
         </div>
       )}
@@ -207,6 +209,52 @@ function TablaItems({ items, subtotal, editable, catalogo, onGuardar }: TablaIte
   );
 }
 
+type EntradaLote = { archivo: File; estado: "en_cola" | "procesando" | "listo" | "error"; resultado?: Comprobante; error?: string };
+const TIPOS_LOTE = ["image/jpeg", "image/png", "application/pdf"];
+
+const estadoLote = (e: EntradaLote): [string, boolean] => {
+  if (e.estado === "en_cola") return ["En cola", false];
+  if (e.estado === "procesando") return ["Procesando…", false];
+  if (e.estado === "error") return [e.error ?? "Error", false];
+  const r = e.resultado!;
+  if (r.venta_id) return [r.estado === "registrado_automaticamente" ? `Registrada automáticamente · venta #${r.venta_id}` : `Registrada · venta #${r.venta_id}`, true];
+  if (r.validaciones.duplicado_de_venta) return [`Ya registrada antes (venta #${r.validaciones.duplicado_de_venta})`, false];
+  return [`Pendiente de revisión (${r.pendientes.length})`, false];
+};
+
+function TablaLote({ lote, procesando, actual, onRevisar }: { lote: EntradaLote[]; procesando: boolean; actual?: number; onRevisar: (e: EntradaLote) => void }) {
+  const hechos = lote.filter((e) => e.estado === "listo" || e.estado === "error").length;
+  const registradas = lote.filter((e) => e.resultado?.venta_id).length;
+  const pendientes = lote.filter((e) => e.resultado && !e.resultado.venta_id && !e.resultado.validaciones.duplicado_de_venta).length;
+  return (
+    <div className="panel" style={{ marginTop: "1rem", overflowX: "auto" }}>
+      <h3 style={{ marginTop: 0 }}>Carpeta: {hechos} de {lote.length} procesadas{procesando ? "…" : ""}</h3>
+      <div style={{ height: 8, background: "var(--bg-soft)", borderRadius: 999, overflow: "hidden", marginBottom: "0.5rem" }}>
+        <div style={{ width: `${(hechos / lote.length) * 100}%`, height: "100%", background: "var(--brand)", transition: "width 0.3s ease" }} />
+      </div>
+      <p className="row-subtitle">{registradas} registradas · {pendientes} por revisar · {lote.filter((e) => e.estado === "error").length} con error</p>
+      <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 640 }}>
+        <thead><tr style={{ textAlign: "left" }}><th>Archivo</th><th>Serie</th><th>Cliente</th><th>Estado</th><th /></tr></thead>
+        <tbody>
+          {lote.map((e) => {
+            const [texto, ok] = estadoLote(e);
+            const r = e.resultado;
+            return (
+              <tr key={e.archivo.name} style={{ borderTop: "1px solid var(--border)", background: r && r.id === actual ? "var(--bg-soft)" : undefined }}>
+                <td>{e.archivo.name}</td>
+                <td>{r?.campos.serie?.valor ?? "—"}</td>
+                <td>{r?.campos.cliente?.valor ?? r?.campos.cliente?.conjunto[0] ?? "—"}</td>
+                <td><span className={`badge ${ok ? "badge-ok" : "badge-warn"}`}>{texto}</span></td>
+                <td>{r && <button className="btn btn-secondary" onClick={() => onRevisar(e)}>{r.venta_id ? "Ver" : "Revisar"}</button>}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 export default function DigitalizarComprobante() {
   const [archivo, setArchivo] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
@@ -218,6 +266,40 @@ export default function DigitalizarComprobante() {
   const [registrando, setRegistrando] = useState(false);
   const [error, setError] = useState("");
   const temporizador = useRef<number | null>(null);
+  const [lote, setLote] = useState<EntradaLote[]>([]);
+  const [procesandoLote, setProcesandoLote] = useState(false);
+
+  // Lo que se resuelve/registra en la revisión se refleja en la fila del lote
+  useEffect(() => {
+    if (resultado) setLote((l) => l.map((e) => (e.resultado?.id === resultado.id ? { ...e, resultado } : e)));
+  }, [resultado]);
+
+  const procesarCarpeta = async (archivos: FileList | null) => {
+    const facturas = Array.from(archivos ?? []).filter((f) => TIPOS_LOTE.includes(f.type)).sort((a, b) => a.name.localeCompare(b.name));
+    if (!facturas.length) return setError("La carpeta no tiene archivos JPG, PNG o PDF");
+    setError("");
+    setResultado(null);
+    setArchivo(null);
+    setLote(facturas.map((archivo) => ({ archivo, estado: "en_cola" })));
+    setProcesandoLote(true);
+    for (const [n, f] of facturas.entries()) {  // de a una: el OCR corre en CPU y así no se satura el servidor
+      setLote((l) => l.map((e, i) => (i === n ? { ...e, estado: "procesando" } : e)));
+      try {
+        const data = await digitalizarComprobante(f);
+        setLote((l) => l.map((e, i) => (i === n ? { ...e, estado: "listo", resultado: data } : e)));
+      } catch (err) {
+        setLote((l) => l.map((e, i) => (i === n ? { ...e, estado: "error", error: mensajeError(err, "No se pudo procesar") } : e)));
+      }
+    }
+    setProcesandoLote(false);
+  };
+
+  const revisar = (e: EntradaLote) => {
+    setResultado(e.resultado ?? null);
+    setConfirmados({});
+    setError("");
+    window.setTimeout(() => document.getElementById("revision")?.scrollIntoView({ behavior: "smooth" }), 50);
+  };
 
   useEffect(() => {
     if (!archivo || !archivo.type.startsWith("image/")) return setPreview(null);
@@ -290,7 +372,7 @@ export default function DigitalizarComprobante() {
       <header className="page-header">
         <div>
           <h1 className="page-title">Digitalizar factura</h1>
-          <p className="page-subtitle">Fotografía o carga una factura emitida por la empresa (JPG, PNG o PDF).</p>
+          <p className="page-subtitle">Fotografía o carga una factura emitida por la empresa (JPG, PNG o PDF), o una carpeta completa.</p>
         </div>
       </header>
 
@@ -303,6 +385,11 @@ export default function DigitalizarComprobante() {
           <label className="btn btn-secondary">
             Cargar archivo
             <input hidden type="file" accept="image/jpeg,image/png,application/pdf" onChange={(e) => elegirArchivo(e.target.files?.[0] || null)} />
+          </label>
+          <label className="btn btn-secondary">
+            Cargar carpeta
+            <input hidden type="file" multiple {...{ webkitdirectory: "", directory: "" }} disabled={procesandoLote}
+              onChange={(e) => { procesarCarpeta(e.target.files); e.target.value = ""; }} />
           </label>
           <button className="btn btn-primary" disabled={!archivo || !!etapa} onClick={procesar}>{etapa ? "Procesando…" : "Procesar factura"}</button>
         </div>
@@ -320,8 +407,10 @@ export default function DigitalizarComprobante() {
         {error && <p className="error">{error}</p>}
       </div>
 
+      {lote.length > 0 && <TablaLote lote={lote} procesando={procesandoLote} actual={resultado?.id} onRevisar={revisar} />}
+
       {resultado && (
-        <div className="panel" style={{ marginTop: "1rem" }}>
+        <div className="panel" id="revision" style={{ marginTop: "1rem" }}>
           <div className="page-header" style={{ marginBottom: "0.75rem" }}>
             <div>
               <h3 style={{ margin: 0 }}>

@@ -4,6 +4,7 @@ export type CampoOCR = {
   valor: string | null;
   conjunto: string[];
   confianza: "alta" | "baja" | "confirmada" | string;
+  probabilidades?: number[];
 };
 
 export type CandidatoProducto = { id: number; nombre: string; similitud: number };
