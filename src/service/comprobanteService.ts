@@ -24,7 +24,7 @@ export const estadisticasComprobantes = async (): Promise<EstadisticasComprobant
 
 export type PendienteRevision = {
   id: number; archivo: string; creado_en: string; serie: string | null; cliente: string | null; total: string | null;
-  faltan: number; duplicado_de_venta: number | null;
+  faltan: number; duplicado_de_venta: number | null; tipo_documento?: string | null; moneda?: string | null;
 };
 
 export const obtenerComprobante = async (id: number): Promise<Comprobante> =>

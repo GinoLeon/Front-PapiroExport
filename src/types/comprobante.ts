@@ -1,4 +1,8 @@
-export type CampoComprobante = "serie" | "ruc" | "razon_social" | "ruc_cliente" | "cliente" | "fecha_emision" | "subtotal" | "igv" | "total";
+export type CampoBase = "serie" | "ruc" | "razon_social" | "ruc_cliente" | "cliente" | "fecha_emision" | "subtotal" | "igv" | "total";
+// Solo en órdenes de compra y guías de remisión
+export type CampoExtra = "tipo_documento" | "moneda" | "referencia" | "fecha_entrega";
+export type CampoComprobante = CampoBase | CampoExtra;
+export type TipoDocumento = "factura" | "orden_compra" | "guia_remision";
 
 export type CampoOCR = {
   valor: string | null;
@@ -46,7 +50,7 @@ export type Comprobante = {
   id: number;
   estado: EstadoComprobante;
   ruc_validado: boolean;
-  campos: Record<CampoComprobante, CampoOCR>;
+  campos: Record<CampoBase, CampoOCR> & Partial<Record<CampoExtra, CampoOCR>>;
   items: ItemComprobante[];
   validaciones: {
     subtotal_mas_igv_igual_total?: boolean;

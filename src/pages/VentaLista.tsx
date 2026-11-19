@@ -150,7 +150,7 @@ const VentasLista = () => {
                 </div>
               </div>
 
-              <p className="row-subtitle">Metodo: {v.metodo_pago} | Total: S/ {Number(v.total).toFixed(2)}</p>
+              <p className="row-subtitle">Metodo: {v.metodo_pago} | Total: {v.moneda === "USD" ? "US$" : "S/"} {Number(v.total).toFixed(2)}{v.estado && v.estado !== "ACTIVA" ? ` | ${v.estado.replace("_", " ").toLowerCase()}` : ""}</p>
 
               <div style={{ margin: "0.6rem 0" }}>
                 {detallesToShow.map((d) => (

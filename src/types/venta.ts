@@ -17,6 +17,7 @@ export interface VentaResponse {
   cliente_id: number;
   total: number;
   estado: string;
+  moneda?: string;
   fecha_venta: string;
   metodo_pago: string;
   fecha_pago: string;

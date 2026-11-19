@@ -7,28 +7,41 @@ import {
   type PendienteRevision,
 } from "../service/comprobanteService";
 import { getProductos } from "../service/productoService";
-import type { CampoComprobante, CampoOCR, Comprobante, ItemComprobante, ItemEntrada } from "../types/comprobante";
+import type { CampoComprobante, CampoOCR, Comprobante, ItemComprobante, ItemEntrada, TipoDocumento } from "../types/comprobante";
 import type { Producto } from "../types/producto";
 
-const SECCIONES: { titulo: string; campos: { key: CampoComprobante; label: string }[] }[] = [
-  { titulo: "Cliente", campos: [{ key: "ruc_cliente", label: "RUC del cliente" }, { key: "cliente", label: "Razón social del cliente" }] },
-  {
-    titulo: "Factura",
-    campos: [
-      { key: "serie", label: "Serie y número" },
-      { key: "fecha_emision", label: "Fecha de emisión" },
-      { key: "subtotal", label: "Valor venta (sin IGV)" },
-      { key: "igv", label: "IGV" },
-      { key: "total", label: "Importe total" },
-    ],
-  },
-  { titulo: "Emisor (se verifica que sea la empresa)", campos: [{ key: "ruc", label: "RUC del emisor" }, { key: "razon_social", label: "Razón social del emisor" }] },
-];
-const CAMPOS_OPCIONALES: CampoComprobante[] = ["razon_social"];
+type Seccion = { titulo: string; campos: { key: CampoComprobante; label: string }[] };
+const CLIENTE: Seccion = { titulo: "Cliente", campos: [{ key: "ruc_cliente", label: "RUC del cliente" }, { key: "cliente", label: "Razón social del cliente" }] };
+const MONTOS = [{ key: "subtotal", label: "Valor venta (sin IGV)" }, { key: "igv", label: "IGV" }, { key: "total", label: "Importe total" }] as const;
+const SECCIONES: Record<TipoDocumento, Seccion[]> = {
+  factura: [
+    CLIENTE,
+    { titulo: "Factura", campos: [{ key: "serie", label: "Serie y número" }, { key: "fecha_emision", label: "Fecha de emisión" }, ...MONTOS] },
+    { titulo: "Emisor (se verifica que sea la empresa)", campos: [{ key: "ruc", label: "RUC del emisor" }, { key: "razon_social", label: "Razón social del emisor" }] },
+  ],
+  orden_compra: [
+    { ...CLIENTE, titulo: "Cliente (emite la orden)" },
+    {
+      titulo: "Orden de compra",
+      campos: [{ key: "serie", label: "N.º de orden" }, { key: "fecha_emision", label: "Fecha" }, { key: "fecha_entrega", label: "Fecha de entrega" },
+        { key: "moneda", label: "Moneda" }, ...MONTOS],
+    },
+    { titulo: "Proveedor (se verifica que sea la empresa)", campos: [{ key: "ruc", label: "RUC del proveedor" }, { key: "razon_social", label: "Razón social del proveedor" }] },
+  ],
+  guia_remision: [
+    { ...CLIENTE, titulo: "Destinatario" },
+    { titulo: "Guía de remisión", campos: [{ key: "serie", label: "Serie y número" }, { key: "fecha_emision", label: "Fecha de emisión" }, { key: "referencia", label: "Orden de compra que atiende" }] },
+    { titulo: "Remitente (se verifica que sea la empresa)", campos: [{ key: "ruc", label: "RUC del remitente" }, { key: "razon_social", label: "Razón social del remitente" }] },
+  ],
+};
+const NOMBRE_TIPO: Record<TipoDocumento, string> = { factura: "Factura", orden_compra: "Orden de compra", guia_remision: "Guía de remisión" };
+const CAMPOS_OPCIONALES: CampoComprobante[] = ["razon_social", "fecha_entrega", "referencia", "moneda"];
+const tipoDe = (c: Comprobante): TipoDocumento => (c.campos.tipo_documento?.valor as TipoDocumento) || "factura";
+const seccionesDe = (c: Comprobante) => SECCIONES[tipoDe(c)].map((s) => ({ ...s, campos: s.campos.filter(({ key }) => c.campos[key]) }));
+const formatoMoneda = (moneda?: string | null) => new Intl.NumberFormat("es-PE", { style: "currency", currency: moneda === "USD" ? "USD" : "PEN" });
 const VERDE = "var(--primary-500)";
 const AMBAR = "var(--secondary-500)";
 const CLAVE_ACTUAL = "digitalizar:actual";
-const soles = new Intl.NumberFormat("es-PE", { style: "currency", currency: "PEN" });
 
 const mensajeError = (err: unknown, porDefecto: string) =>
   (axios.isAxiosError(err) && typeof err.response?.data?.detail === "string" && err.response.data.detail) || porDefecto;
@@ -127,12 +140,15 @@ const NUEVO = "__nuevo__";
 type TablaItemsProps = {
   items: ItemComprobante[];
   subtotal: string | null;
+  moneda?: string | null;
+  conPrecios?: boolean;
   editable: boolean;
   catalogo: Producto[];
   onGuardar: (items: ItemEntrada[]) => Promise<void>;
 };
 
-function TablaItems({ items, subtotal, editable, catalogo, onGuardar }: TablaItemsProps) {
+function TablaItems({ items, subtotal, moneda, conPrecios = true, editable, catalogo, onGuardar }: TablaItemsProps) {
+  const dinero = formatoMoneda(moneda);
   const [filas, setFilas] = useState<ItemEntrada[]>(() => items.map(aEntrada));
   const [cambios, setCambios] = useState(false);
   const [guardando, setGuardando] = useState(false);
@@ -157,7 +173,7 @@ function TablaItems({ items, subtotal, editable, catalogo, onGuardar }: TablaIte
       <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 720 }}>
         <thead>
           <tr style={{ textAlign: "left" }}>
-            <th>Cant.</th><th>Descripción</th><th>Valor unit.</th><th style={{ textAlign: "right" }}>Importe</th><th>Producto del catálogo</th>{editable && <th />}
+            <th>Cant.</th><th>Descripción</th>{conPrecios && <><th>Valor unit.</th><th style={{ textAlign: "right" }}>Importe</th></>}<th>Producto del catálogo</th>{editable && <th />}
           </tr>
         </thead>
         <tbody>
@@ -170,8 +186,10 @@ function TablaItems({ items, subtotal, editable, catalogo, onGuardar }: TablaIte
               <tr key={n} style={{ borderTop: "1px solid var(--border)", borderLeft: `4px solid ${resuelto ? VERDE : AMBAR}` }}>
                 <td><input className="input" style={{ width: 70 }} disabled={!editable} value={f.cantidad} onChange={(e) => editar(n, { cantidad: e.target.value })} /></td>
                 <td><input className="input" style={{ width: "100%" }} disabled={!editable} value={f.descripcion} onChange={(e) => editar(n, { descripcion: e.target.value })} /></td>
-                <td><input className="input" style={{ width: 90 }} disabled={!editable} value={f.valor_unitario} onChange={(e) => editar(n, { valor_unitario: e.target.value })} /></td>
-                <td style={{ textAlign: "right" }}>{soles.format(importe(f))}</td>
+                {conPrecios && <>
+                  <td><input className="input" style={{ width: 90 }} disabled={!editable} value={f.valor_unitario} onChange={(e) => editar(n, { valor_unitario: e.target.value })} /></td>
+                  <td style={{ textAlign: "right" }}>{dinero.format(importe(f))}</td>
+                </>}
                 <td>
                   {editable ? (
                     <select className="select" value={f.crear_producto ? NUEVO : f.producto_id ?? ""}
@@ -201,9 +219,11 @@ function TablaItems({ items, subtotal, editable, catalogo, onGuardar }: TablaIte
         </tbody>
       </table>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "0.5rem", marginTop: "0.6rem" }}>
-        <span className={`badge ${cuadra ? "badge-ok" : "badge-warn"}`}>
-          Suma de ítems {soles.format(suma)} {subtotal !== null && `· valor venta ${soles.format(Number(subtotal))}`}
-        </span>
+        {conPrecios ? (
+          <span className={`badge ${cuadra ? "badge-ok" : "badge-warn"}`}>
+            Suma de ítems {dinero.format(suma)} {subtotal !== null && `· valor venta ${dinero.format(Number(subtotal))}`}
+          </span>
+        ) : <span className="badge">{filas.length} ítem(s) · sin precios</span>}
         {editable && (
           <div className="btn-group">
             <button className="btn btn-secondary" onClick={() => { setFilas((x) => [...x, { cantidad: "1", descripcion: "", valor_unitario: "0.00", producto_id: null, crear_producto: false }]); setCambios(true); }}>
@@ -247,7 +267,7 @@ function TablaLote({ lote, procesando, actual, onRevisar, onCerrar }: { lote: En
       </div>
       <p className="row-subtitle">{registradas} registradas · {pendientes} por revisar · {lote.filter((e) => e.estado === "error").length} con error</p>
       <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 640 }}>
-        <thead><tr style={{ textAlign: "left" }}><th>Archivo</th><th>Serie</th><th>Cliente</th><th>Estado</th><th /></tr></thead>
+        <thead><tr style={{ textAlign: "left" }}><th>Archivo</th><th>Documento</th><th>Cliente</th><th>Estado</th><th /></tr></thead>
         <tbody>
           {lote.map((e) => {
             const [texto, ok] = estadoLote(e);
@@ -420,18 +440,23 @@ export default function DigitalizarComprobante() {
   };
 
   const pendiente = resultado?.estado === "pendiente_revision";
-  const sinCheck = useMemo(() => (resultado ? SECCIONES.flatMap((s) => s.campos).filter(({ key }) => {
+  const sinCheck = useMemo(() => (resultado ? seccionesDe(resultado).flatMap((s) => s.campos).filter(({ key }) => {
     const c = resultado.campos[key];
-    return !CAMPOS_OPCIONALES.includes(key) && esSingleton(c) && c.confianza !== "confirmada" && !confirmados[key];
+    return !!c && !CAMPOS_OPCIONALES.includes(key) && esSingleton(c) && c.confianza !== "confirmada" && !confirmados[key];
   }) : []), [resultado, confirmados]);
+  const tipo = resultado ? tipoDe(resultado) : "factura";
+  const nombreTipo = NOMBRE_TIPO[tipo];
   const ruc = resultado?.validaciones.ruc;
 
   return (
     <section className="page">
       <header className="page-header">
         <div>
-          <h1 className="page-title">Digitalizar factura</h1>
-          <p className="page-subtitle">Fotografía o carga una factura emitida por la empresa (JPG, PNG o PDF), o una carpeta completa.</p>
+          <h1 className="page-title">Digitalizar documentos</h1>
+          <p className="page-subtitle">
+            Fotografía o carga una factura, una orden de compra de un cliente o una guía de remisión (JPG, PNG o PDF), o una carpeta completa.
+            El sistema reconoce el tipo de documento: la orden de compra se registra como pedido y la guía marca su entrega.
+          </p>
         </div>
       </header>
 
@@ -450,7 +475,7 @@ export default function DigitalizarComprobante() {
             <input hidden type="file" multiple {...{ webkitdirectory: "", directory: "" }} disabled={procesandoLote}
               onChange={(e) => { procesarCarpeta(e.target.files); e.target.value = ""; }} />
           </label>
-          <button className="btn btn-primary" disabled={!archivo || !!etapa} onClick={procesar}>{etapa ? "Procesando…" : "Procesar factura"}</button>
+          <button className="btn btn-primary" disabled={!archivo || !!etapa} onClick={procesar}>{etapa ? "Procesando…" : "Procesar documento"}</button>
         </div>
         {archivo && <p className="muted" style={{ marginBottom: 0 }}>Archivo: {archivo.name}</p>}
         {preview && <img src={preview} alt="Vista previa de la factura" style={{ maxHeight: 260, maxWidth: "100%", marginTop: "0.75rem", borderRadius: 8 }} />}
@@ -473,7 +498,7 @@ export default function DigitalizarComprobante() {
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "0.75rem", flexWrap: "wrap" }}>
             <div>
               <h3 style={{ margin: 0 }}>Por revisar ({pendientesLista.length})</h3>
-              <p className="row-subtitle">Facturas que aún no son venta. Se guardan aunque cambies de pestaña o cierres la página.</p>
+              <p className="row-subtitle">Documentos que aún no están registrados. Se guardan aunque cambies de pestaña o cierres la página.</p>
             </div>
             {(!resultado || resultado.venta_id || !pendientesLista.some((p) => p.id === resultado.id)) && (
               <button className="btn btn-primary" onClick={() => abrirPendiente((siguientePendiente(-1) ?? pendientesLista[0]).id)}>Revisar la primera</button>
@@ -484,9 +509,9 @@ export default function DigitalizarComprobante() {
             <tbody>
               {pendientesLista.map((p) => (
                 <tr key={p.id} style={{ background: p.id === resultado?.id ? "var(--primary-50)" : undefined }}>
-                  <td>{p.serie ?? p.archivo}</td>
+                  <td>{p.serie ?? p.archivo}{p.tipo_documento && p.tipo_documento !== "factura" && <span className="badge" style={{ marginLeft: 6 }}>{NOMBRE_TIPO[p.tipo_documento as TipoDocumento]}</span>}</td>
                   <td>{p.cliente ?? "—"}</td>
-                  <td style={{ textAlign: "right" }}>{p.total ? soles.format(Number(p.total)) : "—"}</td>
+                  <td style={{ textAlign: "right" }}>{p.total ? formatoMoneda(p.moneda).format(Number(p.total)) : "—"}</td>
                   <td>
                     <span className="badge badge-warn">
                       {p.duplicado_de_venta ? `Ya registrada (venta #${p.duplicado_de_venta})` : `${p.faltan} por resolver`}
@@ -510,10 +535,11 @@ export default function DigitalizarComprobante() {
           <div className="page-header" style={{ marginBottom: "0.75rem" }}>
             <div>
               <h3 style={{ margin: 0 }}>
-                {resultado.estado === "registrado_automaticamente" && "Venta registrada automáticamente"}
-                {resultado.estado === "registrado_con_revision" && "Venta registrada"}
+                {resultado.estado === "registrado_automaticamente" && `${nombreTipo} registrada automáticamente`}
+                {resultado.estado === "registrado_con_revision" && `${nombreTipo} registrada`}
                 {pendiente && "Revisa los campos en ámbar"}
               </h3>
+              <span className="badge" style={{ marginTop: 4 }}>{nombreTipo}{resultado.campos.moneda?.valor === "USD" ? " · dólares" : ""}</span>
               {resultado.tiempo_procesamiento_ms != null && <p className="row-subtitle">Procesado en {(resultado.tiempo_procesamiento_ms / 1000).toFixed(1)} s</p>}
             </div>
           </div>
@@ -522,9 +548,13 @@ export default function DigitalizarComprobante() {
             {resultado.validaciones.duplicado_de_venta && (
               <span className="badge badge-warn">Ya registrada en la venta #{resultado.validaciones.duplicado_de_venta}</span>
             )}
-            <span className={`badge ${resultado.validaciones.emisor_es_la_empresa !== false ? "badge-ok" : "badge-warn"}`}>Emisor = empresa</span>
-            <span className={`badge ${resultado.validaciones.subtotal_mas_igv_igual_total ? "badge-ok" : "badge-warn"}`}>Valor venta + IGV = Total</span>
-            <span className={`badge ${resultado.validaciones.items_suma_coincide ? "badge-ok" : "badge-warn"}`}>Ítems = valor venta</span>
+            <span className={`badge ${resultado.validaciones.emisor_es_la_empresa !== false ? "badge-ok" : "badge-warn"}`}>
+              {tipo === "orden_compra" ? "Proveedor = empresa" : "Emisor = empresa"}
+            </span>
+            {tipo !== "guia_remision" && <>
+              <span className={`badge ${resultado.validaciones.subtotal_mas_igv_igual_total ? "badge-ok" : "badge-warn"}`}>Valor venta + IGV = Total</span>
+              <span className={`badge ${resultado.validaciones.items_suma_coincide ? "badge-ok" : "badge-warn"}`}>Ítems = valor venta</span>
+            </>}
             <span className={`badge ${resultado.ruc_validado ? "badge-ok" : "badge-warn"}`}>
               RUC del cliente{ruc?.detalle ? ` · ${ruc.detalle}` : ""}
             </span>
@@ -537,11 +567,11 @@ export default function DigitalizarComprobante() {
             </button>
           )}
 
-          {SECCIONES.map((seccion) => (
+          {seccionesDe(resultado).map((seccion) => (
             <div key={seccion.titulo} style={{ marginBottom: "1rem" }}>
               <h4 style={{ margin: "0.5rem 0" }}>{seccion.titulo}</h4>
               {seccion.campos.map(({ key, label }) => (
-                <FilaCampo key={key} label={label} campo={resultado.campos[key]} editable={pendiente}
+                <FilaCampo key={key} label={label} campo={resultado.campos[key]!} editable={pendiente}
                   confirmado={!!confirmados[key]} onConfirmar={(v) => setConfirmados((c) => ({ ...c, [key]: v }))}
                   onResolver={(valor, manual) => conError(() => resolverCampo(resultado.id, key, valor, manual), "No se pudo guardar la corrección")} />
               ))}
@@ -549,7 +579,8 @@ export default function DigitalizarComprobante() {
           ))}
 
           <h4 style={{ margin: "0.5rem 0" }}>Ítems ({resultado.items.length})</h4>
-          <TablaItems items={resultado.items} subtotal={resultado.campos.subtotal.valor} editable={pendiente} catalogo={catalogo}
+          <TablaItems items={resultado.items} subtotal={resultado.campos.subtotal.valor} moneda={resultado.campos.moneda?.valor}
+            conPrecios={tipo !== "guia_remision"} editable={pendiente} catalogo={catalogo}
             onGuardar={(items) => conError(() => resolverItems(resultado.id, items), "No se pudieron guardar los ítems")} />
 
           {pendiente && (
@@ -568,18 +599,21 @@ export default function DigitalizarComprobante() {
                 )}
                 <button className={`btn ${siguientePendiente(resultado.id) ? "btn-secondary" : "btn-primary"}`}
                   disabled={!resultado.puede_registrar || sinCheck.length > 0 || registrando} onClick={() => registrar(false)}>
-                  {registrando ? "Registrando…" : "Registrar venta"}
+                  {registrando ? "Registrando…" : { factura: "Registrar venta", orden_compra: "Registrar pedido", guia_remision: "Registrar entrega" }[tipo]}
                 </button>
                 <button className="btn btn-danger" disabled={registrando}
                   onClick={() => eliminar(resultado.id, resultado.campos.serie?.valor ?? `#${resultado.id}`, false)}>
-                  Descartar factura
+                  Descartar documento
                 </button>
               </div>
             </div>
           )}
           {resultado.venta_id && (
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "0.75rem", flexWrap: "wrap", marginTop: "1rem" }}>
-              <p className="price" style={{ margin: 0 }}>Venta #{resultado.venta_id} registrada con {resultado.items.length} ítem(s).</p>
+              <p className="price" style={{ margin: 0 }}>
+                {tipo === "orden_compra" ? `Pedido (venta #${resultado.venta_id})` : tipo === "guia_remision" ? `Entrega de la venta #${resultado.venta_id}` : `Venta #${resultado.venta_id}`}
+                {" "}registrado con {resultado.items.length} ítem(s).
+              </p>
               <div className="btn-group">
                 {siguientePendiente(resultado.id) && (
                   <button className="btn btn-primary" onClick={() => abrirPendiente(siguientePendiente(resultado.id)!.id)}>Revisar la siguiente</button>
