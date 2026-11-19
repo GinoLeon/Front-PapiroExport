@@ -15,6 +15,7 @@ export type ProductoItem = {
   nuevo: boolean;
   conjunto: CandidatoProducto[];
   confianza: "alta" | "baja" | "confirmada" | string;
+  aprendido?: boolean;
 };
 
 export type ItemComprobante = {
@@ -34,11 +35,8 @@ export type ItemEntrada = {
   crear_producto: boolean;
 };
 
-export type ValidacionSunat = {
+export type ValidacionRuc = {
   valido: boolean;
-  verificado_en_linea: boolean;
-  estado: string | null;
-  razon_social_sunat: string | null;
   detalle: string;
 };
 
@@ -56,7 +54,7 @@ export type Comprobante = {
     duplicado_de_venta?: number | null;
     items_suma_coincide?: boolean;
     items_suma?: string;
-    sunat?: ValidacionSunat;
+    ruc?: ValidacionRuc;
   };
   venta_id: number | null;
   puede_registrar: boolean;

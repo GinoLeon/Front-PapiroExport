@@ -5,7 +5,7 @@ import type { EvaluacionPrediccion, PrediccionClientes, PrediccionProductos, Pre
 
 const soles = new Intl.NumberFormat("es-PE", { style: "currency", currency: "PEN", maximumFractionDigits: 0 });
 const NOMBRES_MODELO: Record<string, string> = {
-  voting: "Voting Regressor", ridge: "Ridge", bosque: "Random Forest", boosting: "Gradient Boosting",
+  voting: "Voting Regressor", lineal: "Regresión Lineal", elasticnet: "ElasticNet", knn: "KNN", bosque: "Random Forest",
   ingenuo_mes_anterior: "Igual al mes anterior", media_3_meses: "Promedio 3 meses", promedio_historico: "Promedio histórico",
 };
 const ANCHO = 760;

@@ -24,3 +24,12 @@ export const realizarItemProduccion = async (
   const response = await api.post<ProduccionItem>(`/producciones/${produccionId}/items/${itemId}/realizar`);
   return response.data;
 };
+
+export type NuevaOrdenProduccion = {
+  venta_id: number | null;
+  nota: string | null;
+  items: { producto_id: number; cantidad: number }[];
+};
+
+export const crearOrdenProduccion = async (orden: NuevaOrdenProduccion): Promise<Produccion> =>
+  (await api.post<Produccion>("/producciones/", orden)).data;

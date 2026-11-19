@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-import { coberturaPorCampo, listarComprobantes, type CoberturaAdmin, type ComprobanteAdmin } from "../service/adminService";
+import { coberturaPorCampo, eliminarComprobanteAdmin, listarComprobantes, type CoberturaAdmin, type ComprobanteAdmin } from "../service/adminService";
 
 const ETIQUETAS: Record<string, string> = {
   serie: "Serie", ruc: "RUC emisor", razon_social: "Razón social emisor", ruc_cliente: "RUC cliente", cliente: "Cliente",
@@ -17,7 +17,22 @@ export default function Auditoria() {
   const [cobertura, setCobertura] = useState<CoberturaAdmin | null>(null);
 
   useEffect(() => { coberturaPorCampo().then(setCobertura).catch(() => setCobertura(null)); }, []);
-  useEffect(() => { listarComprobantes(estado || undefined).then(setComprobantes).catch(() => setComprobantes([])); }, [estado]);
+  const cargar = () => listarComprobantes(estado || undefined).then(setComprobantes).catch(() => setComprobantes([]));
+  useEffect(() => { cargar(); }, [estado]);  // eslint-disable-line react-hooks/exhaustive-deps
+
+  const eliminar = async (c: ComprobanteAdmin) => {
+    const etiqueta = c.serie ?? `#${c.id}`;
+    const aviso = c.venta_id
+      ? `¿Eliminar la factura ${etiqueta}? Se anulará la venta #${c.venta_id} y se devolverá el stock. No se puede deshacer.`
+      : `¿Eliminar la factura ${etiqueta}? Aún no tiene venta registrada.`;
+    if (!window.confirm(aviso)) return;
+    try {
+      await eliminarComprobanteAdmin(c.id);
+      await cargar();
+    } catch {
+      window.alert("No se pudo eliminar la factura (¿su venta ya tiene una orden de producción?).");
+    }
+  };
 
   return (
     <section className="page">
@@ -75,7 +90,7 @@ export default function Auditoria() {
         <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 820, marginTop: "0.75rem" }}>
           <thead>
             <tr style={{ textAlign: "left" }}>
-              <th>Fecha</th><th>Serie</th><th>Cliente</th><th style={{ textAlign: "right" }}>Total</th><th>Ítems</th><th>Vendedor</th><th>Estado</th><th>Tiempo</th><th>Fallas</th>
+              <th>Fecha</th><th>Serie</th><th>Cliente</th><th style={{ textAlign: "right" }}>Total</th><th>Ítems</th><th>Vendedor</th><th>Estado</th><th>Tiempo</th><th>Fallas</th><th />
             </tr>
           </thead>
           <tbody>
@@ -90,6 +105,7 @@ export default function Auditoria() {
                 <td><span className={`badge ${c.venta_id ? "badge-ok" : "badge-warn"}`}>{ESTADOS[c.estado] ?? c.estado}{c.venta_id ? ` · venta #${c.venta_id}` : ""}</span></td>
                 <td>{c.tiempo_procesamiento_ms != null ? `${(c.tiempo_procesamiento_ms / 1000).toFixed(1)} s` : "—"}</td>
                 <td>{c.fallas}</td>
+                <td><button className="btn btn-danger" onClick={() => eliminar(c)}>Eliminar</button></td>
               </tr>
             ))}
           </tbody>

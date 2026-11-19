@@ -21,3 +21,18 @@ export const registrarVentaComprobante = async (id: number): Promise<Comprobante
 
 export const estadisticasComprobantes = async (): Promise<EstadisticasComprobantes> =>
   (await api.get<EstadisticasComprobantes>("/api/comprobantes/estadisticas/resumen")).data;
+
+export type PendienteRevision = {
+  id: number; archivo: string; creado_en: string; serie: string | null; cliente: string | null; total: string | null;
+  faltan: number; duplicado_de_venta: number | null;
+};
+
+export const obtenerComprobante = async (id: number): Promise<Comprobante> =>
+  (await api.get<Comprobante>(`/api/comprobantes/${id}`)).data;
+
+export const listarPendientes = async (): Promise<PendienteRevision[]> =>
+  (await api.get<PendienteRevision[]>("/api/comprobantes/pendientes")).data;
+
+export const eliminarComprobante = async (id: number): Promise<void> => {
+  await api.delete(`/api/comprobantes/${id}`);
+};
