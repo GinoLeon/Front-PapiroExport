@@ -5,7 +5,7 @@ import type { EvaluacionPrediccion, PrediccionClientes, PrediccionProductos, Pre
 
 const soles = new Intl.NumberFormat("es-PE", { style: "currency", currency: "PEN", maximumFractionDigits: 0 });
 const NOMBRES_MODELO: Record<string, string> = {
-  voting: "Voting Regressor", ridge: "Ridge", bosque: "Random Forest", boosting: "Gradient Boosting",
+  voting: "Voting Regressor", lineal: "Regresión Lineal", elasticnet: "ElasticNet", knn: "KNN", bosque: "Random Forest",
   ingenuo_mes_anterior: "Igual al mes anterior", media_3_meses: "Promedio 3 meses", promedio_historico: "Promedio histórico",
 };
 const ANCHO = 760;
@@ -63,12 +63,17 @@ export default function Predicciones() {
   const [productos, setProductos] = useState<PrediccionProductos | null>(null);
   const [clientes, setClientes] = useState<PrediccionClientes | null>(null);
   const [error, setError] = useState(false);
+  const [nivel, setNivel] = useState<"producto" | "tamano">("tamano");
 
   useEffect(() => {
-    Promise.all([prediccionVentas(3), prediccionProductos(10), prediccionClientes(10)])
-      .then(([v, p, c]) => { setVentas(v); setProductos(p); setClientes(c); })
+    Promise.all([prediccionVentas(3), prediccionClientes(10)])
+      .then(([v, c]) => { setVentas(v); setClientes(c); })
       .catch(() => setError(true));
   }, []);
+
+  useEffect(() => {
+    prediccionProductos(10, nivel).then(setProductos).catch(() => setError(true));
+  }, [nivel]);
 
   if (error) return <div className="panel"><p className="muted">No se pudieron calcular las predicciones.</p></div>;
   if (!ventas || !productos || !clientes) return <div className="panel"><p className="muted">Entrenando modelos de predicción…</p></div>;
@@ -91,7 +96,13 @@ export default function Predicciones() {
 
       <div className="dashboard-grid">
         <div className="panel" style={{ overflowX: "auto" }}>
-          <h3 style={{ margin: 0 }}>Productos con más demanda esperada · {productos.mes_objetivo}</h3>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: "0.5rem", flexWrap: "wrap" }}>
+            <h3 style={{ margin: 0 }}>Demanda esperada · {productos.mes_objetivo}</h3>
+            <select className="select" value={nivel} onChange={(e) => setNivel(e.target.value as "producto" | "tamano")}>
+              <option value="tamano">Por tamaño (tela + cuerina)</option>
+              <option value="producto">Por producto</option>
+            </select>
+          </div>
           <Evaluacion evaluacion={productos.evaluacion} unidad={(v) => `${v} u.`} />
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead>
@@ -99,7 +110,7 @@ export default function Predicciones() {
             </thead>
             <tbody>
               {productos.items.map((p) => (
-                <tr key={p.producto_id} style={{ borderTop: "1px solid var(--border)" }}>
+                <tr key={p.nombre} style={{ borderTop: "1px solid var(--border)" }}>
                   <td>{p.nombre}</td>
                   <td style={{ textAlign: "right" }}>{p.cantidad_esperada} u.</td>
                   <td style={{ textAlign: "right" }}>{p.unidades_ultimos_12_meses} u. en {p.meses_con_venta_12} mes(es)</td>

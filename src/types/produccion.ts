@@ -10,9 +10,10 @@ export interface ProduccionItem {
 
 export interface Produccion {
   id: number;
-  venta_id: number;
-  cliente_id: number;
+  venta_id: number | null;
+  cliente_id: number | null;
   usuario_id: number;
+  nota?: string | null;
   estado: string;
   fecha_creacion: string;
   items: ProduccionItem[];

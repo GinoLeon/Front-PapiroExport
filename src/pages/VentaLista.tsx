@@ -14,7 +14,7 @@ const toMetodoPago = (metodo: string): MetodoPago => {
 
 const VentasLista = () => {
   const { hasRole } = useAuth();
-  const canConfirm = hasRole("admin", "vendedor");
+  const canConfirm = hasRole("admin", "jefe", "vendedor");
 
   const [ventas, setVentas] = useState<VentaResponse[]>([]);
   const [clientes, setClientes] = useState<Cliente[]>([]);

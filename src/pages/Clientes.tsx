@@ -6,7 +6,7 @@ import type { Cliente } from "../types/cliente";
 
 const Clientes = () => {
   const { hasRole } = useAuth();
-  const canDelete = hasRole("admin");
+  const canDelete = hasRole("admin", "jefe");
 
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [nombre, setNombre] = useState("");
@@ -21,7 +21,7 @@ const Clientes = () => {
   };
 
   useEffect(() => {
-    cargarClientes();
+    getClientes().then((data) => setClientes(data.filter((c) => c.activo))).catch(() => setClientes([]));
   }, []);
 
   const limpiarFormulario = () => {
@@ -53,7 +53,9 @@ const Clientes = () => {
     setEmail(cliente.email ?? "");
   };
 
-  const borrarCliente = async (id: number) => {
+  const borrarCliente = async (id: number, nombre?: string) => {
+    // Baja lógica: deja de listarse, pero las ventas pasadas lo conservan.
+    if (!window.confirm(`¿Eliminar el cliente "${nombre ?? id}"? Ya no aparecerá en la lista; sus ventas anteriores se conservan.`)) return;
     await eliminarCliente(id);
     await cargarClientes();
   };
@@ -111,7 +113,7 @@ const Clientes = () => {
             </div>
             <div className="btn-group">
               <button className="btn btn-secondary" onClick={() => editarCliente(cliente)}>Editar</button>
-              {canDelete && <button className="btn btn-danger" onClick={() => borrarCliente(cliente.id)}>Eliminar</button>}
+              {canDelete && <button className="btn btn-danger" onClick={() => borrarCliente(cliente.id, cliente.nombre)}>Eliminar</button>}
             </div>
           </article>
         ))}

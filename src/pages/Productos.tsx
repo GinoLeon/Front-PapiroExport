@@ -6,7 +6,7 @@ import type { Producto } from "../types/producto";
 
 const Productos = () => {
   const { hasRole } = useAuth();
-  const canDelete = hasRole("admin");
+  const canDelete = hasRole("admin", "jefe");
 
   const [productos, setProductos] = useState<Producto[]>([]);
   const [nombre, setNombre] = useState("");
@@ -20,7 +20,7 @@ const Productos = () => {
   };
 
   useEffect(() => {
-    cargarProductos();
+    getProductos().then((data) => setProductos(data.filter((p) => p.activo))).catch(() => setProductos([]));
   }, []);
 
   const limpiarFormulario = () => {
@@ -53,7 +53,9 @@ const Productos = () => {
     setEditingId(producto.id);
   };
 
-  const borrarProducto = async (id: number) => {
+  const borrarProducto = async (id: number, nombre?: string) => {
+    // Baja lógica: deja de listarse, pero las ventas pasadas lo conservan.
+    if (!window.confirm(`¿Eliminar el producto "${nombre ?? id}"? Ya no aparecerá en la lista; sus ventas anteriores se conservan.`)) return;
     await eliminarProducto(id);
     await cargarProductos();
   };
@@ -115,7 +117,7 @@ const Productos = () => {
             </div>
             <div className="btn-group">
               <button className="btn btn-secondary" onClick={() => editarProducto(producto)}>Editar</button>
-              {canDelete && <button className="btn btn-danger" onClick={() => borrarProducto(producto.id)}>Eliminar</button>}
+              {canDelete && <button className="btn btn-danger" onClick={() => borrarProducto(producto.id, producto.nombre)}>Eliminar</button>}
             </div>
           </article>
         ))}

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 
 import { getClientes } from "../service/clienteService";
 import { getProductos } from "../service/productoService";
@@ -48,7 +48,7 @@ const Ventas = () => {
     return producto ? Number(producto.precio) * detalle.cantidad : 0;
   };
 
-  const total = useMemo(() => detalles.reduce((acc, d) => acc + calcularSubtotal(d), 0), [detalles, productos]);
+  const total = detalles.reduce((acc, d) => acc + calcularSubtotal(d), 0);
 
   const registrarVenta = async () => {
     if (!clienteId || detalles.length === 0) {
