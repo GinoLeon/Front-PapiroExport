@@ -28,7 +28,7 @@ const AppShell = () => {
   return (
     <div className="app-shell">
       <aside className="sidebar">
-        <h1 className="brand-title">COMSER LMG SAC</h1>
+        <h1 className="brand-title">Gestión de Ventas</h1>
         <p className="brand-subtitle">Panel comercial</p>
 
         <div className="user-chip">
